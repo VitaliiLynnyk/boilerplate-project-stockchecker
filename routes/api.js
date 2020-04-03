@@ -1,23 +1,45 @@
 /*
-*
-*
-*       Complete the API routing below
-*
-*
-*/
+ *
+ *
+ *       Complete the API routing below
+ *
+ *
+ */
 
 'use strict';
 
-var expect = require('chai').expect;
-var MongoClient = require('mongodb');
+const expect = require('chai').expect;
+const axios = require('axios');
 
-const CONNECTION_STRING = process.env.DB; //MongoClient.connect(CONNECTION_STRING, function(err, db) {});
+module.exports = (app) => {
+  app.route('/api/stock-prices').get((req, res) => {
+    const { stock, like } = req.query;
+    let promiseArray = [];
+    if (Array.isArray(stock)) {
+      stock.forEach((e) => {
+        promiseArray.push(e);
+      });
+    } else {
+      promiseArray.push(stock);
+    }
+    promiseArray = promiseArray.map((stock) => getPrice(stock));
 
-module.exports = function (app) {
-
-  app.route('/api/stock-prices')
-    .get(function (req, res){
-      
+    Promise.all(promiseArray).then((results) => {
+      if (results.length === 1) {
+        res.json({ stockData: { ...results[0], likes: +!!like } });
+      } else {
+        let parsed = results.map((e) => {
+          return { stockData: { ...e, rel_likes: +!!like } };
+        });
+        res.json({ stockData: parsed });
+      }
     });
-    
+  });
 };
+
+async function getPrice(stock) {
+  const response = await axios.get(
+    `https://repeated-alpaca.glitch.me/v1/stock/${stock}/quote`
+  );
+  return { stock: stock, price: response.data.latestPrice };
+}
